@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dr. Rawat // Arcade Protocol</title>
 
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -23,6 +23,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             overflow: hidden; user-select: none;
             transition: background-color 2s; 
+            touch-action: none; /* Prevents scroll on touch devices */
         }
 
         #game-wrapper { 
@@ -76,6 +77,48 @@
         .theme-riddler { border-color: var(--riddler-green); box-shadow: 0 0 20px rgba(57,255,20,0.2); } .theme-riddler h1, .theme-riddler h2 { color: var(--riddler-green); } .theme-riddler li::before { color: var(--riddler-green); } .theme-riddler .pub-box { border-left-color: var(--riddler-green); }
         .theme-freeze { border-color: var(--freeze-blue); box-shadow: 0 0 20px rgba(0,212,255,0.2); } .theme-freeze h1, .theme-freeze h2 { color: var(--freeze-blue); } .theme-freeze li::before { color: var(--freeze-blue); } .theme-freeze .pub-box { border-left-color: var(--freeze-blue); }
         .theme-ivy { border-color: var(--ivy-green); box-shadow: 0 0 20px rgba(46,204,113,0.2); } .theme-ivy h1, .theme-ivy h2 { color: var(--ivy-green); } .theme-ivy li::before { color: var(--ivy-green); } .theme-ivy .pub-box { border-left-color: var(--ivy-green); }
+
+        /* TOUCH CONTROLS CSS */
+        #touch-controls {
+            display: none;
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            justify-content: space-between;
+            padding: 0 15px;
+            box-sizing: border-box;
+            z-index: 50;
+        }
+
+        .touch-pad, .action-pad { display: grid; gap: 8px; }
+        .touch-pad { grid-template-areas: ". up ." "left down right"; }
+        .action-pad { grid-template-areas: "special interact" ". fire"; align-content: end; }
+        
+        .t-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid var(--riddler-green);
+            color: var(--riddler-green);
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            width: 55px; height: 55px;
+            border-radius: 8px;
+            user-select: none;
+            touch-action: none;
+            outline: none;
+        }
+        .t-btn:active { background: rgba(57, 255, 20, 0.4); }
+        
+        .btn-up { grid-area: up; } .btn-down { grid-area: down; }
+        .btn-left { grid-area: left; } .btn-right { grid-area: right; }
+        .btn-fire { grid-area: fire; width: 65px; height: 65px; border-color: var(--bat-yellow); color: var(--bat-yellow); font-size: 1.2rem;}
+        .btn-interact { grid-area: interact; border-color: var(--freeze-blue); color: var(--freeze-blue);}
+        .btn-special { grid-area: special; border-color: var(--joker-purple); color: var(--joker-purple);}
+
+        /* Enable touch controls only on devices that use a touchscreen primarily */
+        @media (pointer: coarse) {
+            #touch-controls { display: flex; }
+            #game-wrapper { height: 65vh; margin-bottom: 25vh; } /* Make room for the controls */
+        }
     </style>
 </head>
 <body id="body-main">
@@ -88,6 +131,20 @@
         <div id="data-content" class="data-card theme-base">
             <button class="close-btn" onclick="closeTerminal()">[ ESC ] CLOSE</button>
             <div id="inject-content"></div>
+        </div>
+    </div>
+
+    <div id="touch-controls">
+        <div class="touch-pad">
+            <button class="t-btn btn-up" id="t-up">W</button>
+            <button class="t-btn btn-left" id="t-left">A</button>
+            <button class="t-btn btn-down" id="t-down">S</button>
+            <button class="t-btn btn-right" id="t-right">D</button>
+        </div>
+        <div class="action-pad">
+            <button class="t-btn btn-special" id="t-special">Q</button>
+            <button class="t-btn btn-interact" id="t-interact">E</button>
+            <button class="t-btn btn-fire" id="t-fire">FIRE</button>
         </div>
     </div>
 
@@ -279,11 +336,12 @@
             ctx.fillRect(0, 0, canvas.width, 40); 
             ctx.fillRect(0, canvas.height - 40, canvas.width, 40); 
 
-            // Mission Tracker
+            // Mission Tracker (Updated context to reflect boss mechanics)
             ctx.fillStyle = '#ffcc00'; ctx.font = '22px VT323';
-            let missionText = `MISSION: ACCESS ${terminalNames[missionProgress]} [${missionProgress}/6]`;
+            let missionText = `MISSION: DEFEAT WARDEN TO UNLOCK SECURE FILES`;
             if (bossIntroPhase || bossActive) missionText = `WARNING: WARDEN DETECTED. NEUTRALIZE THREAT.`;
-            if (bloodLevel) missionText = `BLOOD LEVEL INITIATED: PROTOCOLS OVERRIDDEN.`;
+            if (bossDefeated) missionText = `WARDEN ELIMINATED. ALL DATA UNLOCKED [${missionProgress}/6 READ]`;
+            if (bloodLevel) missionText = `BLOOD LEVEL INITIATED: PROTOCOLS OVERRIDDEN. DATA UNLOCKED.`;
             if (missionProgress === 6) missionText = `MISSION COMPLETE: ALL SYSTEMS NOMINAL`;
             
             ctx.fillStyle = bloodLevel ? '#f00' : '#ffcc00';
@@ -307,7 +365,7 @@
             }
         }
 
-        // --- 3. INPUT HANDLING ---
+        // --- 3. INPUT HANDLING & TOUCH CONTROLS ---
         const keys = { w: false, a: false, s: false, d: false };
         let moveTimer = 0;
         
@@ -341,6 +399,32 @@
             if(e.key === 'a' || e.key === 'ArrowLeft') keys.a = false;
             if(e.key === 's' || e.key === 'ArrowDown') keys.s = false;
             if(e.key === 'd' || e.key === 'ArrowRight') keys.d = false;
+        });
+
+        // Touch Listeners mapping to key events
+        const bindTouch = (id, keyChar, actionMap) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevents zoom/scroll
+                if(!audioInit) initAudio();
+                if (actionMap) actionMap();
+                else keys[keyChar] = true;
+            });
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (!actionMap) keys[keyChar] = false;
+            });
+        };
+
+        bindTouch('t-up', 'w'); bindTouch('t-down', 's');
+        bindTouch('t-left', 'a'); bindTouch('t-right', 'd');
+        bindTouch('t-fire', null, () => player.shoot());
+        bindTouch('t-interact', null, () => {
+            if(!isGamePaused && activeTerminal && !bossIntroPhase) openTerminal(activeTerminal);
+        });
+        bindTouch('t-special', null, () => {
+            if(bossActive && !bossDefeated && specialUses > 0 && !isGamePaused) fireShockwave();
         });
 
         // --- 4. GRAPHICS, PARTICLES & ITEMS ---
@@ -695,7 +779,7 @@
             let near = false;
             
             terminals.forEach(t => {
-                let isLocked = t.id > missionProgress;
+                let isLocked = !bossDefeated; // Only unlocked once the boss is dead
                 drawTerminalSprite(t.x, t.y, t.size, t.color, isLocked);
                 
                 ctx.fillStyle = isLocked ? '#555' : '#fff'; 
@@ -711,12 +795,12 @@
             });
 
             if(near && !isGamePaused && !bossIntroPhase && activeTerminal && !gameOver) {
-                let isLocked = activeTerminal.id > missionProgress;
-                ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x - 100, player.y - 40, 230, 30);
+                let isLocked = !bossDefeated;
+                ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x - 100, player.y - 40, 240, 30);
                 
                 if(isLocked) {
                     ctx.fillStyle = '#f00'; ctx.font = '16px VT323';
-                    ctx.fillText('ACCESS DENIED: COMPLETE PRIOR OBJECTIVES', player.x - 90, player.y - 20);
+                    ctx.fillText('ACCESS DENIED: DEFEAT WARDEN TO UNLOCK', player.x - 90, player.y - 20);
                 } else {
                     ctx.fillStyle = '#ffcc00'; ctx.font = '16px VT323';
                     ctx.fillText('PRESS [E] TO EXTRACT DATA', player.x - 70, player.y - 20);
@@ -760,10 +844,11 @@
 
         // --- 9. UI CONTROLS ---
         function openTerminal(t) {
-            if(t.id > missionProgress) { sfx.denied(); return; }
+            if(!bossDefeated) { sfx.denied(); return; }
 
-            if(t.id === missionProgress) {
-                missionProgress++;
+            // Still track progress just for score tracking, but you can open them in any order now
+            if(t.id >= missionProgress) {
+                missionProgress = Math.min(6, missionProgress + 1);
                 score += 1000;
                 if(score > highScore) { highScore = score; localStorage.setItem('rawatScore', highScore); }
             }
