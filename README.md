@@ -136,7 +136,7 @@ While this is a game, many physics principles are grounded in reality:
 ## 📝 Game Credits
 
 **Inspired by**: AEgIS Collaboration, CERN Antiproton Decelerator Facility
-
+**Original concept and developed by**: Dr.Bharat Singh Rawat/ University of Liverpool
 **Physics Concepts**: Based on publications and resources from:
 - The AEgIS experiment at CERN
 - CERN's Antiproton Decelerator (AD) program
@@ -155,3 +155,4 @@ This project is designed for educational purposes. Please refer to the repositor
 ---
 
 **Have fun exploring the fascinating world of antimatter physics!**
+
